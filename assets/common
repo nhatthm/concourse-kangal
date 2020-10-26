@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+
+KANGAL_PROXY_HOST=${KANGAL_PROXY_HOST-kangal.tools-k8s.hellofresh.io}
+DATE="date"
+
+if [[ -n "$(command -v gdate)" ]]; then
+    DATE="gdate"
+fi
+
+function get_tags_as_string() {
+    echo "$1" | jq -r '[(.tags // {}) | to_entries[] | "\(.key):\(.value)"] | join(",")'
+}
+
+function get_version() {
+    local loadTest=$1
+    local type=$(echo "$loadTest" | jq -r '.type // ""')
+    local distributedPods=$(echo "$loadTest" | jq -r '.distributedPods // ""')
+    local loadtestName=$(echo "$loadTest" | jq -r '.loadtestName // ""')
+    local tags=$(get_tags_as_string "$loadTest")
+    local timestamp=$(echo "$loadTest" | jq -r '.tags.timestamp // ""')
+
+    jq -n \
+        --arg type "$type" \
+        --arg distributedPods "$distributedPods" \
+        --arg loadtestName "$loadtestName" \
+        --arg tags "$tags" \
+        --arg timestamp "$timestamp" \
+        '{type: $type, loadtestName: $loadtestName, distributedPods: $distributedPods, tags: $tags, timestamp: $timestamp}'
+}
+
+function get_metadata() {
+    local loadTest=$1
+    local type=$(echo "$loadTest" | jq -r '.type // ""')
+    local distributedPods=$(echo "$loadTest" | jq -r '.distributedPods // ""')
+    local loadtestName=$(echo "$loadTest" | jq -r '.loadtestName // ""')
+    local tags=$(get_tags_as_string "$loadTest")
+    local timestamp=$(echo "$loadTest" | jq -r '.tags.timestamp // ""')
+    local date
+
+    if [[ -n "$timestamp" ]]; then
+        date=$(date -d @"$(echo "${timestamp}/1000" | bc)" +'%Y-%m-%dT%H:%M:%SZ')
+    fi
+
+    jq -n \
+        --arg type "$type" \
+        --arg distributedPods "$distributedPods" \
+        --arg loadtestName "$loadtestName" \
+        --arg tags "$tags" \
+        --arg date "$date" \
+        '[{name: "type", value: $type}, {name: "loadtestName", value: $loadtestName}, {name: "distributedPods", value: $distributedPods}, {name: "tags", value: $tags}, {name: "timestamp", value: $date}]'
+}
+
+function export_vars() {
+    local loadTest=$1
+    local type=$(echo "$loadTest" | jq -r '.type // ""')
+    local distributedPods=$(echo "$loadTest" | jq -r '.distributedPods // ""')
+    local loadtestName=$(echo "$loadTest" | jq -r '.loadtestName // ""')
+    local phase=$(echo "$loadTest" | jq -r '.phase // ""')
+    local tags=$(get_tags_as_string "$loadTest")
+    local timestamp=$(echo "$loadTest" | jq -r '.tags.timestamp // ""')
+    local timestamp30mBefore=$(echo "${timestamp}-1800000" | bc)
+    local timestamp30mAfter=$(echo "${timestamp}+1800000" | bc)
+
+    cat <<EOF
+#!/usr/bin/env bash
+
+export LOAD_TEST_NAME=$loadtestName
+export LOAD_TEST_TYPE=$type
+export LOAD_TEST_DISTRIBUTED_PODS=$distributedPods
+export LOAD_TEST_PHASE=$phase
+export LOAD_TEST_TAGS=$tags
+export LOAD_TEST_TIMESTAMP=$timestamp
+export LOAD_TEST_TIMESTAMP_30MIN_BEFORE=$timestamp30mBefore
+export LOAD_TEST_TIMESTAMP_30MIN_AFTER=$timestamp30mAfter
+EOF
+}
+
+function urlencode() {
+    local LANG=C
+    local str=${*:-`cat`}
+
+    for ((i=0;i<${#str};i++)); do
+        if [[ ${str:$i:1} =~ ^[a-zA-Z0-9\.\~\_\-]$ ]]; then
+            printf "%s" "${str:$i:1}"
+        else
+            printf '%%%02X' "'${str:$i:1}"
+        fi
+    done
+}

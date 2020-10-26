@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+CURDIR=$(exec 2>/dev/null;cd -- "$(dirname "${BASH_SOURCE[0]}")"; unset PWD; /usr/bin/pwd || /bin/pwd || pwd)
+
+set -e
+set -o pipefail
+
+exec 3>&1 # make stdout available as fd 3 for the result
+exec 1>&2 # redirect all output to stderr for logging
+
+# shellcheck source=/dev/null
+. "$CURDIR/common"
+
+destination=$1
+
+if [ -z "$destination" ]; then
+    echo "usage: $0 <path/to/destination>" >&2
+    exit 1
+fi
+
+# Read inputs.
+payload=$(mktemp "$TMPDIR/kangal-request.XXXXXX")
+cat > "$payload" <&0
+
+proxyHost=$(jq -r '.source.proxy_host // ""' < "$payload")
+loadtestName=$(jq -r '.version.loadtestName // ""' < "$payload")
+
+if [[ -z "$loadtestName" ]]; then
+    echo "missing load test name"
+    exit 1
+fi
+
+if [[ -n "$proxyHost" ]]; then
+    KANGAL_PROXY_HOST="$proxyHost"
+fi
+
+loadtest=$(curl -s "http://$KANGAL_PROXY_HOST/load-test/$(urlencode "$loadtestName")" 2>/dev/null | jq -c -M .)
+
+version=$(\
+    jq -c -M -n \
+        --argjson version "$(get_version "$loadtest")" \
+        --argjson metadata "$(get_metadata "$loadtest")" \
+        '{version: $version, metadata: $metadata}' \
+)
+
+echo "$loadtest" > "$destination/loadtest.json"
+export_vars "$loadtest" > "$destination/env"
+
+echo "$version" | jq .
+
+echo "$version" >&3
+
