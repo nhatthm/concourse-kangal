@@ -62,8 +62,6 @@ function export_vars() {
     local timestamp30mAfter=$(echo "${timestamp}+1800000" | bc)
 
     cat <<EOF
-#!/usr/bin/env bash
-
 export LOAD_TEST_NAME=$loadtestName
 export LOAD_TEST_TYPE=$type
 export LOAD_TEST_DISTRIBUTED_PODS=$distributedPods

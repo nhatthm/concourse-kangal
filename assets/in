@@ -46,7 +46,14 @@ version=$(\
 echo "$loadtest" > "$destination/loadtest.json"
 export_vars "$loadtest" > "$destination/env"
 
+echo "[Version]"
+echo
 echo "$version" | jq .
+
+echo
+echo "[Env]"
+echo
+cat "$destination/env"
 
 echo "$version" >&3
 
