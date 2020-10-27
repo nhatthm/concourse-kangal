@@ -32,6 +32,13 @@ if [[ -n "$phase" ]]; then
     loadTests=$(echo "$loadTests" | jq -c -M --arg phase "$phase" '[.[] | select(.phase == $phase)]')
 fi
 
+# Filter by current timestamp
+currentTimestamp=$(jq -r '.version.timestamp // ""' < "$payload" || true)
+
+if [[ -n "$currentTimestamp" ]]; then
+    loadTests=$(echo "$loadTests" | jq -c -M --arg timestamp "$currentTimestamp" '[.[] | select(.tags.timestamp > $timestamp)]')
+fi
+
 # Convert load test payload to resource version.
 result='[]'
 
