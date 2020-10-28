@@ -2,10 +2,38 @@
 
 KANGAL_PROXY_HOST=${KANGAL_PROXY_HOST-kangal.tools-k8s.hellofresh.io}
 DATE="date"
+SED="sed"
 
 if [[ -n "$(command -v gdate)" ]]; then
     DATE="gdate"
 fi
+
+if [[ -n "$(command -v gsed)" ]]; then
+    SED="gsed"
+fi
+
+REPORT_COLUMNS='{
+    "Apdex": "apdex",
+    "T (Toleration threshold)": "toleration_threshold",
+    "F (Frustration threshold)": "frustration_threshold",
+    "Label": "label",
+    "#Samples": "num_samples",
+    "KO": "ko",
+    "Error %": "error_rate",
+    "Average": "average",
+    "Min": "min",
+    "Max": "max",
+    "90th pct": "90th_percentile",
+    "95th pct": "95th_percentile",
+    "99th pct": "99th_percentile",
+    "Throughput": "throughput",
+    "Received": "received",
+    "Sent": "sent",
+    "Type of error": "error_type",
+    "Number of errors": "num_errors",
+    "% in errors": "percent_in_errors",
+    "% in all samples": "percent_in_samples"
+}'
 
 function get_tags_as_string() {
     echo "$1" | jq -r '[(.tags // {}) | del(.source) | del(."concourse-build-id") | to_entries[] | "\(.key):\(.value)"] | join(",")'
@@ -38,7 +66,7 @@ function get_metadata() {
     local date
 
     if [[ -n "$timestamp" ]]; then
-        date=$(date -d @"$(echo "${timestamp}/1000" | bc)" +'%Y-%m-%dT%H:%M:%SZ')
+        date=$($DATE -d @"$(echo "${timestamp}/1000" | bc)" +'%Y-%m-%dT%H:%M:%SZ')
     fi
 
     jq -n \
@@ -48,6 +76,101 @@ function get_metadata() {
         --arg tags "$tags" \
         --arg date "$date" \
         '[{name: "type", value: $type}, {name: "loadtestName", value: $loadtestName}, {name: "distributedPods", value: $distributedPods}, {name: "tags", value: $tags}, {name: "timestamp", value: $date}]'
+}
+
+function get_report() {
+    local loadtestName=$1
+    local tmpDir
+
+    if [[ -z "$loadtestName" ]]; then
+        echo "missing load test name" >&2
+        return 1
+    fi
+
+    tmpDir=$(mktemp -d) && trap "rm -rf ${tmpDir}" EXIT
+    local dashboardFile="$tmpDir/dashboard.js"
+
+    local status=$(curl -s -S "http://$KANGAL_PROXY_HOST/load-test/$(urlencode "$loadtestName")/report/content/js/dashboard.js" --out "$dashboardFile" -w "%{http_code}")
+
+    if [[ "$status" != "200" || ! -f "$dashboardFile" ]]; then
+        echo "could not download report" >&2
+        return 1
+    fi
+
+    local summary='{}'
+
+    while read -r line; do
+        local report=$(parse_report "$line" 2>/dev/null)
+
+        if [[ -z "$report" ]]; then
+            echo "could not parse report: $line" >&2
+            return 1
+        fi
+
+        summary=$(echo "${summary}${report}" | jq -s add)
+    done < <(grep 'createTable($(' "$dashboardFile" | grep -v top5ErrorsBySampler)
+
+    echo "$summary"
+}
+
+function parse_report() {
+    local raw=$1
+    local reportName=$(echo "$raw" | $SED -E 's/createTable\(\$\("#([a-zA-Z0-9]+)Table"\),.*/\1/g')
+    local reportData=$(echo "$raw" | $SED -E "s/createTable\(\\$\(\"#${reportName}Table\"\),(.*)/\1/g" | jq -c -M . 2>/dev/null)
+
+    if [[ -z "$reportData" ]]; then
+        echo "could not parse: $raw" >&2
+        return 1
+    fi
+
+    local report='{"overall": null, "items": []}'
+    local IFS=$'\n'
+    local props=()
+
+    while read -r title; do
+        local prop=$(echo "$REPORT_COLUMNS" | jq -r --arg title "$title" ".\"$title\" // \$title" 2>/dev/null)
+
+        if [[ -z "$prop" ]]; then
+            echo "could not get property from title $title" >&2
+            return 1
+        fi
+
+        props+=("$prop")
+    done < <(echo "$reportData" | jq -r '(.titles // []) | .[]')
+
+    # Parse overall.
+    while read -r line; do
+        local key=$(echo "$line" | jq -r ".key" 2>/dev/null)
+        local val=$(echo "$line" | jq -r ".value" 2>/dev/null)
+        local prop=${props[$key]}
+
+        if [[ -z "$prop" ]]; then
+            echo "could not get property of index $key in report $reportName" >&2
+            return 1
+        fi
+
+        report=$(echo "$report" | jq -c -M --arg value "$val" ".overall.\"$prop\" = \$value")
+    done < <(echo "$reportData" | jq -c -M '(.overall.data // []) | to_entries | .[]' 2>/dev/null)
+
+    # Parse items.
+    while read -r item; do
+        local index=$(echo "$item" | jq -r ".key" 2>/dev/null)
+
+        while read -r line; do
+            local key=$(echo "$line" | jq -r ".key" 2>/dev/null)
+            local val=$(echo "$line" | jq -r ".value" 2>/dev/null)
+            local prop=${props[$key]}
+
+            if [[ -z "$prop" ]]; then
+                echo "could not get property of index $key in report $reportName" >&2
+                return 1
+            fi
+
+            report=$(echo "$report" | jq -c -M --arg value "$val" ".items[$index].\"$prop\" = \$value")
+        done < <(echo "$item" | jq -c -M '(.value.data // []) | to_entries | .[]' 2>/dev/null)
+    done < <(echo "$reportData" | jq -c -M '(.items // []) | to_entries | .[]' 2>/dev/null)
+
+    jq -n -c -M --argjson report "$report" "{\"$reportName\": \$report}"
 }
 
 function export_vars() {
@@ -71,6 +194,30 @@ export LOAD_TEST_TIMESTAMP=$timestamp
 export LOAD_TEST_TIMESTAMP_30MIN_BEFORE=$timestamp30mBefore
 export LOAD_TEST_TIMESTAMP_30MIN_AFTER=$timestamp30mAfter
 EOF
+}
+
+function export_report() {
+    if [[ ! -f "$1" ]]; then
+        echo "missing report file $1" >&2
+        return 1
+    fi
+
+    local roundNumFn='def roundit: if ((.|type) == "number" or (.|test("^[0-9]+[.][0-9]+$"))) then ((.|tonumber)*100.0|round/100.0) else . end'
+
+    while read -r report; do
+        local key=$(echo "$report" | jq -r ".key" 2>/dev/null)
+        local varPrefix="LOAD_TEST_REPORT_$(echo "$key" | tr "[:lower:]" "[:upper:]")"
+
+        # Export overall.
+        echo "$report" | jq -r "$roundNumFn; (.value.overall // {}) | to_entries | .[] | \"export ${varPrefix}_OVERALL_\(.key|ascii_upcase)=\(.value|roundit)\"" 2>/dev/null
+
+        # Export items.
+        while read -r line; do
+            local varItemPrefix=$(echo "$line" | jq -r ". | \"${varPrefix}_ITEMS_\(.key)\"" 2>/dev/null)
+
+            echo "$line" | jq -r "$roundNumFn; (.value // {}) | to_entries | .[] | \"export ${varItemPrefix}_\(.key|ascii_upcase)=\(.value|roundit)\"" 2>/dev/null
+        done < <(echo "$report" | jq -c -M '(.value.items // []) | to_entries | .[]')
+    done < <(jq -c -M 'to_entries | .[]' < "$1" 2>/dev/null)
 }
 
 function urlencode() {
