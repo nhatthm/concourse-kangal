@@ -24,6 +24,7 @@ cat > "$payload" <&0
 
 proxyHost=$(jq -r '.source.proxy_host // ""' < "$payload")
 loadtestName=$(jq -r '.version.loadtestName // ""' < "$payload")
+report=$(jq -r '.params.report // "false"' < "$payload")
 
 if [[ -z "$loadtestName" ]]; then
     echo "missing load test name"
@@ -49,6 +50,11 @@ export_vars "$loadtest" > "$destination/env"
 echo "[Version]"
 echo
 echo "$version" | jq .
+
+if [[ "$report" == "true" ]]; then
+    get_report "$loadtestName" > "$destination/report.json"
+    export_report "$destination/report.json" >> "$destination/env"
+fi
 
 echo
 echo "[Env]"
