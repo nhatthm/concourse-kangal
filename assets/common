@@ -8,7 +8,7 @@ if [[ -n "$(command -v gdate)" ]]; then
 fi
 
 function get_tags_as_string() {
-    echo "$1" | jq -r '[(.tags // {}) | to_entries[] | "\(.key):\(.value)"] | join(",")'
+    echo "$1" | jq -r '[(.tags // {}) | del(.source) | del(."concourse-build-id") | to_entries[] | "\(.key):\(.value)"] | join(",")'
 }
 
 function get_version() {
