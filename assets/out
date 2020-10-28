@@ -28,7 +28,13 @@ proxyHost=$(jq -r '.source.proxy_host // ""' < "$payload")
 plan=$(jq -r '.params.plan // ""' < "$payload")
 data=$(jq -r '.params.data // ""' < "$payload")
 distributedPods=$(jq -r '.params.pods // 1' < "$payload")
-tags=$(jq -c -M -r --arg timestamp "$(echo "$($DATE +'%s%N')/1000000" | bc)" '[((.source.tags // {}) | .timestamp = $timestamp) | to_entries[] | "\(.key):\(.value)"] | join(",")' < "$payload")
+tags=$(\
+    jq -c -M -r \
+        --arg 'timestamp' "$(echo "$($DATE +'%s%N')/1000000" | bc)" \
+        --arg 'source' 'concourse' \
+        --arg buildId "${BUILD_ID}" \
+        '[((.source.tags // {}) | .timestamp = $timestamp | .source = $source | ."concourse-build-id" = $buildId) | to_entries[] | "\(.key):\(.value)"] | join(",")' < "$payload" \
+)
 type=$(jq -r '.params.type // "JMeter"' < "$payload")
 overwrite=$(jq -r '.params.overwrite // "false"' < "$payload")
 
