@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-KANGAL_PROXY_HOST=${KANGAL_PROXY_HOST-kangal.tools-k8s.hellofresh.io}
+KANGAL_PROXY_HOST=${KANGAL_PROXY_HOST:-kangal.tools-k8s.hellofresh.io}
 DATE="date"
 SED="sed"
 
