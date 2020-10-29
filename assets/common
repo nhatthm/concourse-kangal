@@ -138,6 +138,8 @@ function parse_report() {
         props+=("$prop")
     done < <(echo "$reportData" | jq -r '(.titles // []) | .[]')
 
+    local convertNumFn='def convertNum: if ((.|type) == "number" or (.|test("^[0-9]+[.][0-9]+$"))) then (.|tonumber) else . end'
+
     # Parse overall.
     while read -r line; do
         local key=$(echo "$line" | jq -r ".key" 2>/dev/null)
@@ -149,7 +151,7 @@ function parse_report() {
             return 1
         fi
 
-        report=$(echo "$report" | jq -c -M --arg value "$val" ".overall.\"$prop\" = \$value")
+        report=$(echo "$report" | jq -c -M --arg value "$val" "$convertNumFn; .overall.\"$prop\" = (\$value|convertNum)")
     done < <(echo "$reportData" | jq -c -M '(.overall.data // []) | to_entries | .[]' 2>/dev/null)
 
     # Parse items.
@@ -166,7 +168,7 @@ function parse_report() {
                 return 1
             fi
 
-            report=$(echo "$report" | jq -c -M --arg value "$val" ".items[$index].\"$prop\" = \$value")
+            report=$(echo "$report" | jq -c -M --arg value "$val" "$convertNumFn; .items[$index].\"$prop\" = (\$value|convertNum)")
         done < <(echo "$item" | jq -c -M '(.value.data // []) | to_entries | .[]' 2>/dev/null)
     done < <(echo "$reportData" | jq -c -M '(.items // []) | to_entries | .[]' 2>/dev/null)
 
@@ -202,7 +204,7 @@ function export_report() {
         return 1
     fi
 
-    local roundNumFn='def roundit: if ((.|type) == "number" or (.|test("^[0-9]+[.][0-9]+$"))) then ((.|tonumber)*100.0|round/100.0) else . end'
+    local roundNumFn='def roundit: if ((.|type) == "number") then (.*100.0|round/100.0) else . end'
 
     while read -r report; do
         local key=$(echo "$report" | jq -r ".key" 2>/dev/null)
