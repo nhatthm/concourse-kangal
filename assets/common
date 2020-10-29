@@ -138,7 +138,7 @@ function parse_report() {
         props+=("$prop")
     done < <(echo "$reportData" | jq -r '(.titles // []) | .[]')
 
-    local convertNumFn='def convertNum: if ((.|type) == "number" or (.|test("^[0-9]+[.][0-9]+$"))) then (.|tonumber) else . end'
+    local convertNumFn='def convertNum: if ((.|type) == "number" or (.|test("^[0-9]+([.][0-9]+)?$"))) then (.|tonumber) else . end'
 
     # Parse overall.
     while read -r line; do
