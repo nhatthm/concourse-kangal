@@ -183,8 +183,14 @@ function export_vars() {
     local phase=$(echo "$loadTest" | jq -r '.phase // ""')
     local tags=$(get_tags_as_string "$loadTest")
     local timestamp=$(echo "$loadTest" | jq -r '.tags.timestamp // ""')
+    local timestamp60mBefore=$(echo "${timestamp}-3600000" | bc)
+    local timestamp45mBefore=$(echo "${timestamp}-2700000" | bc)
     local timestamp30mBefore=$(echo "${timestamp}-1800000" | bc)
+    local timestamp15mBefore=$(echo "${timestamp}-900000" | bc)
+    local timestamp15mAfter=$(echo "${timestamp}+900000" | bc)
     local timestamp30mAfter=$(echo "${timestamp}+1800000" | bc)
+    local timestamp45mAfter=$(echo "${timestamp}+2700000" | bc)
+    local timestamp60mAfter=$(echo "${timestamp}+3600000" | bc)
 
     cat <<EOF
 export LOAD_TEST_NAME=$loadtestName
@@ -193,8 +199,14 @@ export LOAD_TEST_DISTRIBUTED_PODS=$distributedPods
 export LOAD_TEST_PHASE=$phase
 export LOAD_TEST_TAGS=$tags
 export LOAD_TEST_TIMESTAMP=$timestamp
+export LOAD_TEST_TIMESTAMP_60MIN_BEFORE=$timestamp60mBefore
+export LOAD_TEST_TIMESTAMP_45MIN_BEFORE=$timestamp45mBefore
 export LOAD_TEST_TIMESTAMP_30MIN_BEFORE=$timestamp30mBefore
+export LOAD_TEST_TIMESTAMP_15MIN_BEFORE=$timestamp15mBefore
+export LOAD_TEST_TIMESTAMP_15MIN_AFTER=$timestamp15mAfter
 export LOAD_TEST_TIMESTAMP_30MIN_AFTER=$timestamp30mAfter
+export LOAD_TEST_TIMESTAMP_45MIN_AFTER=$timestamp45mAfter
+export LOAD_TEST_TIMESTAMP_60MIN_AFTER=$timestamp60mAfter
 EOF
 }
 
