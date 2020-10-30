@@ -30,7 +30,7 @@ data=$(jq -r '.params.data // ""' < "$payload")
 distributedPods=$(jq -r '.params.pods // 1' < "$payload")
 tags=$(\
     jq -c -M -r \
-        --arg 'timestamp' "$(echo "$($DATE +'%s%N')/1000000" | bc)" \
+        --arg 'timestamp' "$(echo "$($DATE +'%s%N' -u)/1000000" | bc)" \
         --arg 'source' 'concourse' \
         --arg buildId "${BUILD_ID}" \
         '[((.source.tags // {}) | .timestamp = $timestamp | .source = $source | ."concourse-build-id" = $buildId) | to_entries[] | "\(.key):\(.value)"] | join(",")' < "$payload" \

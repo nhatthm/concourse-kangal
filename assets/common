@@ -66,7 +66,7 @@ function get_metadata() {
     local date
 
     if [[ -n "$timestamp" ]]; then
-        date=$($DATE -d @"$(echo "${timestamp}/1000" | bc)" +'%Y-%m-%dT%H:%M:%SZ')
+        date=$($DATE -d @"$(echo "${timestamp}/1000" | bc)" +'%Y-%m-%dT%H:%M:%SZ' -u)
     fi
 
     jq -n \
@@ -182,6 +182,7 @@ function export_vars() {
     local loadtestName=$(echo "$loadTest" | jq -r '.loadtestName // ""')
     local phase=$(echo "$loadTest" | jq -r '.phase // ""')
     local tags=$(get_tags_as_string "$loadTest")
+    # Timestamps.
     local timestamp=$(echo "$loadTest" | jq -r '.tags.timestamp // ""')
     local timestamp60mBefore=$(echo "${timestamp}-3600000" | bc)
     local timestamp45mBefore=$(echo "${timestamp}-2700000" | bc)
@@ -191,6 +192,26 @@ function export_vars() {
     local timestamp30mAfter=$(echo "${timestamp}+1800000" | bc)
     local timestamp45mAfter=$(echo "${timestamp}+2700000" | bc)
     local timestamp60mAfter=$(echo "${timestamp}+3600000" | bc)
+
+    # Dates.
+    local date60mBefore=$($DATE -d @"$(echo "${timestamp60mBefore}/1000" | bc)" +'%Y-%m-%dT%H:%M:%SZ' -u)
+    local date45mBefore=$($DATE -d @"$(echo "${timestamp45mBefore}/1000" | bc)" +'%Y-%m-%dT%H:%M:%SZ' -u)
+    local date30mBefore=$($DATE -d @"$(echo "${timestamp30mBefore}/1000" | bc)" +'%Y-%m-%dT%H:%M:%SZ' -u)
+    local date15mBefore=$($DATE -d @"$(echo "${timestamp15mBefore}/1000" | bc)" +'%Y-%m-%dT%H:%M:%SZ' -u)
+    local date15mAfter=$($DATE -d @"$(echo "${timestamp15mAfter}/1000" | bc)" +'%Y-%m-%dT%H:%M:%SZ' -u)
+    local date30mAfter=$($DATE -d @"$(echo "${timestamp30mAfter}/1000" | bc)" +'%Y-%m-%dT%H:%M:%SZ' -u)
+    local date45mAfter=$($DATE -d @"$(echo "${timestamp45mAfter}/1000" | bc)" +'%Y-%m-%dT%H:%M:%SZ' -u)
+    local date60mAfter=$($DATE -d @"$(echo "${timestamp60mAfter}/1000" | bc)" +'%Y-%m-%dT%H:%M:%SZ' -u)
+
+    # Dates with microseconds.
+    local dateMs60mBefore="${date60mBefore:0:(-1)}.000Z"
+    local dateMs45mBefore="${date45mBefore:0:(-1)}.000Z"
+    local dateMs30mBefore="${date30mBefore:0:(-1)}.000Z"
+    local dateMs15mBefore="${date15mBefore:0:(-1)}.000Z"
+    local dateMs15mAfter="${date15mAfter:0:(-1)}.000Z"
+    local dateMs30mAfter="${date30mAfter:0:(-1)}.000Z"
+    local dateMs45mAfter="${date45mAfter:0:(-1)}.000Z"
+    local dateMs60mAfter="${date60mAfter:0:(-1)}.000Z"
 
     cat <<EOF
 export LOAD_TEST_NAME=$loadtestName
@@ -207,6 +228,22 @@ export LOAD_TEST_TIMESTAMP_15MIN_AFTER=$timestamp15mAfter
 export LOAD_TEST_TIMESTAMP_30MIN_AFTER=$timestamp30mAfter
 export LOAD_TEST_TIMESTAMP_45MIN_AFTER=$timestamp45mAfter
 export LOAD_TEST_TIMESTAMP_60MIN_AFTER=$timestamp60mAfter
+export LOAD_TEST_DATE_60MIN_BEFORE=$date60mBefore
+export LOAD_TEST_DATE_45MIN_BEFORE=$date45mBefore
+export LOAD_TEST_DATE_30MIN_BEFORE=$date30mBefore
+export LOAD_TEST_DATE_15MIN_BEFORE=$date15mBefore
+export LOAD_TEST_DATE_15MIN_AFTER=$date15mAfter
+export LOAD_TEST_DATE_30MIN_AFTER=$date30mAfter
+export LOAD_TEST_DATE_45MIN_AFTER=$date45mAfter
+export LOAD_TEST_DATE_60MIN_AFTER=$date60mAfter
+export LOAD_TEST_DATE_MS_60MIN_BEFORE=$dateMs60mBefore
+export LOAD_TEST_DATE_MS_45MIN_BEFORE=$dateMs45mBefore
+export LOAD_TEST_DATE_MS_30MIN_BEFORE=$dateMs30mBefore
+export LOAD_TEST_DATE_MS_15MIN_BEFORE=$dateMs15mBefore
+export LOAD_TEST_DATE_MS_15MIN_AFTER=$dateMs15mAfter
+export LOAD_TEST_DATE_MS_30MIN_AFTER=$dateMs30mAfter
+export LOAD_TEST_DATE_MS_45MIN_AFTER=$dateMs45mAfter
+export LOAD_TEST_DATE_MS_60MIN_AFTER=$dateMs60mAfter
 EOF
 }
 
