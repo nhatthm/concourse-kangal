@@ -62,13 +62,17 @@ export_vars "$loadtest" > "$destination/env"
 echo "[Version]"
 echo
 echo "$version" | jq .
+echo
 
 if [[ "$report" == "true" ]]; then
+    echo "[Report]"
+    echo
     get_report "$loadtestName" > "$destination/report.json"
     export_report "$destination/report.json" >> "$destination/env"
+    echo "done"
+    echo
 fi
 
-echo
 echo "[Env]"
 echo
 cat "$destination/env"
