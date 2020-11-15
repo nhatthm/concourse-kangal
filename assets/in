@@ -49,6 +49,11 @@ if [[ -n "$error" ]]; then
     exit 1
 fi
 
+echo "[Load Test]"
+echo
+echo "$loadtest" | jq .
+echo
+
 version=$(\
     jq -c -M -n \
         --argjson version "$(get_version "$loadtest")" \
