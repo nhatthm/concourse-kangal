@@ -54,6 +54,9 @@ echo
 echo "$loadtest" | jq .
 echo
 
+# Enforce load test name.
+loadtest=$(echo "$loadtest" | jq -c -M --arg loadtestName "$loadtestName" '.loadtestName = $loadtestName' 2>/dev/null)
+
 version=$(\
     jq -c -M -n \
         --argjson version "$(get_version "$loadtest")" \
