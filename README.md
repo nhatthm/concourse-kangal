@@ -220,6 +220,9 @@ export LOAD_TEST_REPORT_ERRORS_ITEMS_2_PERCENT_IN_SAMPLES=0
 * `overwrite`: Overwrite the load test if exists. Possible values: `true` or `false`
 * `type`: Load test type.
 
+###### Optional
+* `vars`: The path to environment variables file.
+
 Those parameters will be used to create load test with this API call.
 
 The load test will be tagged with `tags` in `source` configuration plus current timestamp in nanoseconds (in order to sort the versions).
@@ -232,7 +235,8 @@ curl -X POST http://${KANGAL_PROXY_ADDRESS}/load-test \
   -F testData=@${data} \
   -F tags=${tags} \
   -F type=${type} \
-  -F overwrite=${overwrite}
+  -F overwrite=${overwrite} \
+  -F envVars=@${vars}
 ```
 
 ## Usage
@@ -294,5 +298,6 @@ jobs:
       params:
         plan: load-tests/testplan.jmx
         data: load-tests/testdata.csv
+        vars: load-tests/envVars.csv
         pods: "9"
 ```

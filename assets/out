@@ -27,6 +27,7 @@ cat > "$payload" <&0
 proxyHost=$(jq -r '.source.proxy_host // ""' < "$payload")
 plan=$(jq -r '.params.plan // ""' < "$payload")
 data=$(jq -r '.params.data // ""' < "$payload")
+vars=$(jq -r '.params.vars // ""' < "$payload")
 distributedPods=$(jq -r '.params.pods // 1' < "$payload")
 tags=$(\
     jq -c -M -r \
@@ -49,10 +50,16 @@ if [ -n "$data" ] && [ ! -f "$data" ]; then
     exit 1
 fi
 
+if [ -n "$vars" ] && [ ! -f "$vars" ]; then
+    echo "environment variables file '$vars' does not exist"
+    exit 1
+fi
+
 if [[ -n "$proxyHost" ]]; then
     KANGAL_PROXY_HOST="$proxyHost"
 fi
 
+# Printing inputs
 echo "KANGAL_PROXY_HOST: $KANGAL_PROXY_HOST"
 echo "LOAD_TEST_FILE: $plan"
 echo "LOAD_TEST_DATA: $data"
@@ -60,6 +67,12 @@ echo "LOAD_TEST_DISTRIBUTED_PODS: $distributedPods"
 echo "LOAD_TEST_TAGS: $tags"
 echo "LOAD_TEST_TYPE: $type"
 echo "LOAD_TEST_OVERWRITE: $overwrite"
+
+# Optionals
+if [ -n "$vars" ]; then
+    echo "LOAD_TEST_ENV_VARS: $vars"
+fi
+
 echo
 
 if [ -n "$data" ]; then
@@ -72,16 +85,23 @@ if [ -n "$data" ]; then
     echo
 fi
 
-cat <<EOF
-curl -vvv -s "http://$KANGAL_PROXY_HOST/load-test" \
-    -H 'Content-Type: multipart/form-data'
-    -F distributedPods="$distributedPods" \
-    -F testFile=@"$plan" \
-    -F testData=@"$data" \
-    -F tags="$tags" \
-    -F type="$type" \
-    -F overwrite="$overwrite"
-EOF
+req="
+curl -vvv -s http://$KANGAL_PROXY_HOST/load-test
+  -H 'Content-Type: multipart/form-data'
+  -F distributedPods=$distributedPods
+  -F testFile=@$plan
+  -F testData=@$data
+  -F tags=$tags
+  -F type=$type
+  -F overwrite=$overwrite
+"
+
+opt=""
+if [ -n "$vars" ]; then
+    opt="$opt -F envVars=@$vars"
+fi
+
+echo "executing: $req $opt"
 
 echo
 
@@ -94,6 +114,7 @@ loadtest=$(\
         -F tags="$tags" \
         -F type="$type" \
         -F overwrite="$overwrite" \
+        $opt
 )
 
 echo
