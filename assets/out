@@ -96,12 +96,14 @@ curl -vvv -s http://$KANGAL_PROXY_HOST/load-test
   -F overwrite=$overwrite
 "
 
-opt=""
+opts=()
 if [ -n "$vars" ]; then
-    opt="$opt -F envVars=@$vars"
+    opts+=("-F" "envVars=@$vars")
 fi
 
-echo "executing: $req $opt"
+echo "[Create Load Test]"
+echo
+echo "$req ${opts[*]}"
 
 echo
 
@@ -114,7 +116,7 @@ loadtest=$(\
         -F tags="$tags" \
         -F type="$type" \
         -F overwrite="$overwrite" \
-        $opt
+        "${opts[@]}"
 )
 
 echo
