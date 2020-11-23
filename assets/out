@@ -103,7 +103,7 @@ fi
 
 echo "[Create Load Test]"
 echo
-echo "$req ${opts[*]}"
+echo "$req  ${opts[*]}"
 
 echo
 
