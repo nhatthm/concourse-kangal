@@ -86,7 +86,7 @@ if [ -n "$data" ]; then
 fi
 
 req="
-curl -vvv -s http://$KANGAL_PROXY_HOST/load-test
+curl -vvv -s -X POST http://$KANGAL_PROXY_HOST/load-test
   -H 'Content-Type: multipart/form-data'
   -F distributedPods=$distributedPods
   -F testFile=@$plan
@@ -108,7 +108,7 @@ echo "$req  ${opts[*]}"
 echo
 
 loadtest=$(\
-    curl -vvv -s "http://$KANGAL_PROXY_HOST/load-test" \
+    curl -vvv -s -X POST "http://$KANGAL_PROXY_HOST/load-test" \
         -H 'Content-Type: multipart/form-data' \
         -F distributedPods="$distributedPods" \
         -F testFile=@"$plan" \
